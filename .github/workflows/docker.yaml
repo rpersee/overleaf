@@ -1,0 +1,80 @@
+name: Build & Publish
+
+on:
+  push:
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    env:
+      MONOREPO_REVISION: ${{ github.sha }}
+      BRANCH_NAME: ${{ github.ref_name }}
+      OVERLEAF_BASE_BRANCH: ghcr.io/${{ github.repository_owner }}/sharelatex-base:${{ github.ref_name }}
+      OVERLEAF_BASE_LATEST: ghcr.io/${{ github.repository_owner }}/sharelatex-base
+      OVERLEAF_BASE_TAG: ghcr.io/${{ github.repository_owner }}/sharelatex-base:${{ github.ref_name }}-${{ github.sha }}
+      OVERLEAF_BRANCH: ghcr.io/${{ github.repository_owner }}/sharelatex:${{ github.ref_name }}
+      OVERLEAF_LATEST: ghcr.io/${{ github.repository_owner }}/sharelatex
+      OVERLEAF_TAG: ghcr.io/${{ github.repository_owner }}/sharelatex:${{ github.ref_name }}-${{ github.sha }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker # share storage with the local Docker registry
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ github.token }}
+
+      - name: Copy .dockerignore from server-ce/
+        run: cp server-ce/.dockerignore .
+
+      - name: Build base image
+        uses: docker/build-push-action@v6
+        with:
+          file: server-ce/Dockerfile-base
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+          cache-from: |
+            ${{ env.OVERLEAF_BASE_LATEST }}
+            ${{ env.OVERLEAF_BASE_BRANCH }}
+          tags: |
+            ${{ env.OVERLEAF_BASE_TAG }}
+            ${{ env.OVERLEAF_BASE_BRANCH }}
+          load: true
+          pull: true
+          push: false
+          platforms: linux/arm64
+
+      - name: Build community image
+        uses: docker/build-push-action@v6
+        with:
+          file: server-ce/Dockerfile
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+            OVERLEAF_BASE_TAG=${{ env.OVERLEAF_BASE_TAG }}
+            MONOREPO_REVISION=${{ env.MONOREPO_REVISION }}
+          cache-from: |
+            ${{ env.OVERLEAF_LATEST }}
+            ${{ env.OVERLEAF_BRANCH }}
+          tags: |
+            ${{ env.OVERLEAF_TAG }}
+            ${{ env.OVERLEAF_BRANCH }}
+          load: false
+          pull: false
+          push: true
+          platforms: linux/arm64
