@@ -9,6 +9,8 @@ services:
         depends_on:
             mongo:
                 condition: service_healthy
+            mongo-init:
+                condition: service_completed_successfully
             redis:
                 condition: service_started
         ports:
@@ -106,6 +108,7 @@ services:
     mongo:
         restart: always
         image: mongo:5.0
+        command: "--replSet overleaf"
         container_name: mongo
         expose:
             - 27017
@@ -116,6 +119,20 @@ services:
             interval: 10s
             timeout: 10s
             retries: 5
+
+    mongo-init:
+        restart: "no"
+        image: mongo:5.0
+        container_name: mongo-init
+        depends_on:
+            mongo:
+                condition: service_healthy
+        entrypoint:
+            - "mongo"
+            - "--host"
+            - "mongo:27017"
+            - "--eval"
+            - "db.isMaster().primary || rs.initiate({_id: \"overleaf\", members: [{_id: 0, host: \"mongo:27017\"}]})"
 
     redis:
         restart: always
