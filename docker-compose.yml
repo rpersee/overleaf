@@ -1,3 +1,8 @@
+volumes:
+  sharelatex_data:
+  mongo_data:
+  redis_data:
+
 services:
     sharelatex:
         restart: always
@@ -19,7 +24,7 @@ services:
             - redis
         stop_grace_period: 60s
         volumes:
-            - ~/sharelatex_data:/var/lib/overleaf
+            - sharelatex_data:/var/lib/overleaf
             ########################################################################
             ####  Server Pro: Uncomment the following line to mount the docker  ####
             ####             socket, required for Sibling Containers to work    ####
@@ -112,7 +117,7 @@ services:
         expose:
             - 27017
         volumes:
-            - ~/mongo_data:/data/db
+            - mongo_data:/data/db
         healthcheck:
             test: echo 'db.stats().ok' | mongo localhost:27017/test --quiet
             interval: 10s
@@ -140,7 +145,7 @@ services:
         expose:
             - 6379
         volumes:
-            - ~/redis_data:/data
+            - redis_data:/data
 
     # ldap:
     #    restart: always
